@@ -4,7 +4,7 @@ on:
  workflow_dispatch:      # Allows manual trigger
 
 env:
-  RESOURCE-GROUP: rg-eshoponweb-NAME
+  RESOURCE-GROUP: testRG
   LOCATION: eastus
   TEMPLATE-FILE: infra/webapp.bicep
   SUBSCRIPTION-ID: 032db9e9-fdb1-408b-a555-1f43327ebb94
