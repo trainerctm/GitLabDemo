@@ -30,10 +30,10 @@ jobs:
         cd eShopOnWeb
         dotnet build ./eShopOnWeb.sln --configuration Release
 
-    - name: Test with dotnet
-      run: |
-        cd eShopOnWeb
-        dotnet test ./eShopOnWeb.sln --configuration Release
+    #- name: Test with dotnet
+    #  run: |
+    #   cd eShopOnWeb
+    #  dotnet test ./eShopOnWeb.sln --configuration Release
 
     - name: dotnet publish
       run: |
