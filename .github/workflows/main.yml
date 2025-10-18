@@ -1,0 +1,96 @@
+name: eShopOnWeb Build and Deploy
+
+on:
+ workflow_dispatch:      # Allows manual trigger
+
+env:
+  RESOURCE-GROUP: rg-eshoponweb-NAME
+  LOCATION: eastus
+  TEMPLATE-FILE: infra/webapp.bicep
+  SUBSCRIPTION-ID: 032db9e9-fdb1-408b-a555-1f43327ebb94
+  WEBAPP-NAME: eshoponweb-webapp-NAME
+
+jobs:
+  buildandtest:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Clone GitLab repo
+      run: |
+        git clone https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/kupushachete-group/eShopOnWeb.git
+        cd eShopOnWeb
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        dotnet-quality: 'preview'
+
+    - name: Build with dotnet
+      run: |
+        cd eShopOnWeb
+        dotnet build ./eShopOnWeb.sln --configuration Release
+
+    - name: Test with dotnet
+      run: |
+        cd eShopOnWeb
+        dotnet test ./eShopOnWeb.sln --configuration Release
+
+    - name: dotnet publish
+      run: |
+        cd eShopOnWeb
+        dotnet publish ./src/Web/Web.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+        cd ${{env.DOTNET_ROOT}}/myapp
+        zip -r ../app.zip .
+
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: .net-app
+        path: ${{env.DOTNET_ROOT}}/app.zip
+
+    - name: Upload bicep template
+      uses: actions/upload-artifact@v4
+      with:
+        name: bicep-template
+        path: eShopOnWeb/${{ env.TEMPLATE-FILE }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: buildandtest
+    environment:
+      name: 'Development'
+    steps:
+    - name: Download .NET app artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: .net-app
+        path: .net-app
+
+    - name: Download bicep template artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: bicep-template
+        path: bicep-template
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy infrastructure with Bicep
+      uses: azure/arm-deploy@v2
+      with:
+        subscriptionId: ${{ env.SUBSCRIPTION-ID }}
+        resourceGroupName: ${{ env.RESOURCE-GROUP }}
+        template: bicep-template/webapp.bicep
+        parameters: 'webAppName=${{ env.WEBAPP-NAME }} location=${{ env.LOCATION }}'
+        failOnStdErr: false
+
+    - name: Publish Website to WebApp using CLI
+      uses: Azure/cli@v2
+      with:
+        inlineScript: |
+          az webapp deploy --name ${{ env.WEBAPP-NAME }} \
+                           --resource-group ${{ env.RESOURCE-GROUP }} \
+                           --src-path .net-app/app.zip \
+                           --type zip
